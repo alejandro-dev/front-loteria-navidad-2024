@@ -1,0 +1,174 @@
+---
+import Alert from './Alert.astro';
+import Input from './Input.astro';
+import Button from './Button.astro';
+import ListNumbers from './ListNumbers.astro';
+
+let alertType = 'hidden';
+let messageAlert = '';
+---
+
+<form class="max-w-sm mx-auto mt-10">
+    <Alert id="alert" message={messageAlert} class={alertType}/>
+    <Input id="email" type="email" label="Introduce tu email: " placeholder="ejemplo@loteria.com" />
+    <Input id="loteryNumber" type="number" label="Introduce tus números de lotería: " placeholder="90210" />
+
+    <Button id="addNumber" label="Añadir número" />
+    <Button id="send" label="Enviar" />
+
+    <ListNumbers />
+    
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const emailInput = document.getElementById('email') as HTMLInputElement;
+        const loteryNumberInput = document.getElementById('loteryNumber') as HTMLInputElement;
+        const addNumberButton = document.getElementById('addNumber');
+        const numberList = document.getElementById('numberList');
+        const numbersContainer = document.getElementById('numbersContainer');
+        const sendButton = document.getElementById('send');
+        const alertElement = document.getElementById('alert') as HTMLInputElement;
+
+        let lotteryNumbers: string[] = [];
+        let messageAlert = '';
+        let alertType = '';
+
+        if (emailInput && addNumberButton && numberList && sendButton && alertElement) {
+
+            // Evento al añadir el número de la lotería
+            addNumberButton.addEventListener('click', () => {
+                const lotteryNumber = loteryNumberInput.value;
+
+                if (lotteryNumber) {
+                    // Comprobamos que tiene al menos 5 caracteres
+                    if(lotteryNumber.length < 5) {
+                        alertType = 'text-yellow-400';
+                        messageAlert = 'Por favor, ingresa un número de lotería válido';
+                        updateAlert();
+                        return; 
+                    };
+
+                    // Agregar el número al array
+                    lotteryNumbers.push(lotteryNumber);
+
+                    // Limpiar el campo de entrada
+                    loteryNumberInput.value = '';
+
+                    // Mostrar los números en la lista debajo del formulario
+                    updateNumberList();
+
+                    numberList.style.display = lotteryNumbers.length > 0 ? 'block' : 'none';
+                    alertType = 'hidden';
+                    updateAlert();
+
+                } else {
+                    alertType = 'text-yellow-400';
+                    messageAlert = 'Por favor, ingresa al menos un número de lotería';
+                    updateAlert();
+                }
+            });
+
+            // Validar el número de la lotería
+            loteryNumberInput.addEventListener('input', function () {
+                const value = loteryNumberInput.value;
+
+                // Limitar a 5 dígitos
+                if (value.length > 5) {
+                    loteryNumberInput.value = value.slice(0, 5);
+                    return;
+                } 
+            });
+
+            // Evento al pulsar el botón de enviar
+            sendButton.addEventListener('click', (event) => {
+                const email = emailInput.value;
+                // Expresión regular para validar email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+                if (!emailRegex.test(email)) {
+                    event.preventDefault();
+                    alertType = 'text-yellow-400';
+                    messageAlert = 'Añade un email válido';
+                    updateAlert();
+                    return;
+                };
+
+                if(lotteryNumbers.length === 0) {
+                    event.preventDefault();
+                    alertType = 'text-yellow-400';
+                    messageAlert = 'Añade al menos un número de lotería';
+                    updateAlert();
+                    return;
+                };
+
+                sendData();
+            });
+        }
+
+        // Función para actualizar la lista de números de lotería
+        const updateNumberList = () => {
+            if(!numbersContainer) return;
+
+            // Limpiar la lista actual
+            numbersContainer.innerHTML = '';
+
+            // Recorrer el array y añadir los números a la lista
+            lotteryNumbers.forEach(number => {
+                const li = document.createElement('li');
+                li.textContent = number;
+                li.style.fontStyle = 'italic';
+                numbersContainer.appendChild(li);
+            });
+        };
+
+        // Función para enviar los datos del formulario
+        const sendData = async () => {
+            const url = `${import.meta.env.PUBLIC_URL_BACKEND}/api/send-data`; 
+            const data = { lotteryNumbers, email: emailInput.value };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST', 
+                    headers: {
+                        'Content-Type': 'application/json', 
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                const responseData = await response.json();
+
+                // Parece que ha habido algún error
+                if(response.status !== 200) {
+                    alertType = responseData.status === 'fail' ? 'text-yellow-400' : 'text-red-400';
+                    messageAlert = responseData.message || '¡Error! Vuelve a intentarlo más tarde';
+                    updateAlert();
+                    return;
+                }
+
+                // Todo ha salido correcto
+                alertType = 'text-green-400'
+                messageAlert = 'Enhorabuena! Tus datos se han enviado correctamente. Estate pendiente de tu correo. ¡Mucha suerte!';
+                updateAlert();
+
+                // Limpiamos el formulario
+                emailInput.value = '';
+                lotteryNumbers = [];
+                if(numbersContainer) numbersContainer.innerHTML = '';
+                if(numberList) numberList.style.display = 'none';
+
+            } catch (error) {
+                alertType = 'text-red-400';
+                messageAlert = '¡Error! Vuelve a intentarlo más tarde';
+                updateAlert();
+            }
+        }
+
+        // Función para actualizar el mensaje y tipo de alerta
+        const updateAlert = () => {
+            alertElement.textContent = messageAlert; // Cambia el mensaje de alerta
+            alertElement.className = `p-4 mb-4 text-sm rounded-lg bg-gray-800 ${alertType}`; // Actualiza la clase de la alerta
+            alertElement.style.display = alertType !== 'hidden' ? 'block' : 'none'; // Muestra u oculta la alerta
+        };
+    });
+</script>
